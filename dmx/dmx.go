@@ -3,10 +3,12 @@ package dmx
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
+	"unsafe"
 
-	serialpkg "go.bug.st/serial"
+	"golang.org/x/sys/unix"
 )
 
 // DMXController controls a Eurolite USB DMX 512 PRO (MK2).
@@ -18,7 +20,7 @@ import (
 //
 // length = 513 (start code + 512 data) -> LSB=0x01, MSB=0x02
 type DMXController struct {
-	port     serialpkg.Port
+	port     *os.File
 	mutex    sync.Mutex
 	channels [512]byte
 
@@ -36,29 +38,78 @@ func Open(device string) (*DMXController, error) {
 		return nil, errors.New("device path is required")
 	}
 
-	mode := &serialpkg.Mode{
-		BaudRate: 250000,
-		DataBits: 8,
-		Parity:   serialpkg.NoParity,
-		StopBits: serialpkg.TwoStopBits,
-	}
-
-	p, err := serialpkg.Open(device, mode)
+	// Open the serial port
+	port, err := os.OpenFile(device, os.O_RDWR, 0)
 	if err != nil {
 		return nil, fmt.Errorf("open serial port: %w", err)
 	}
 
-	// Set DTR and RTS to low (important for FTDI-based devices like MK2)
-	if err := p.SetDTR(false); err != nil {
-		fmt.Printf("Warning: could not set DTR: %v\n", err)
-	}
-	if err := p.SetRTS(false); err != nil {
-		fmt.Printf("Warning: could not set RTS: %v\n", err)
+	// Configure the serial port using termios
+	if err := configurePort(port); err != nil {
+		port.Close()
+		return nil, fmt.Errorf("configure port: %w", err)
 	}
 
 	return &DMXController{
-		port: p,
+		port: port,
 	}, nil
+}
+
+// configurePort sets up the serial port with the correct settings for DMX
+func configurePort(port *os.File) error {
+	fd := int(port.Fd())
+
+	// Get current termios settings
+	termios, err := unix.IoctlGetTermios(fd, unix.TIOCGETA)
+	if err != nil {
+		return fmt.Errorf("get termios: %w", err)
+	}
+
+	// Set baud rate to 250000
+	// On macOS, use IOSSIOSPEED for arbitrary baud rates
+	const IOSSIOSPEED = 0x80045402 // _IOW('T', 2, speed_t)
+	speed := uintptr(250000)
+	_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), IOSSIOSPEED, uintptr(unsafe.Pointer(&speed)))
+	if errno != 0 {
+		return fmt.Errorf("set baud rate: %w", errno)
+	}
+
+	// Configure for raw mode (manually since unix.Cfmakeraw is not available)
+	termios.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON
+	termios.Oflag &^= unix.OPOST
+	termios.Lflag &^= unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN
+	termios.Cflag &^= unix.CSIZE | unix.PARENB
+	termios.Cflag |= unix.CS8
+
+	// 8 data bits, no parity, 2 stop bits
+	termios.Cflag |= unix.CLOCAL | unix.CREAD
+	termios.Cflag &^= unix.PARENB // No parity
+	termios.Cflag |= unix.CSTOPB  // 2 stop bits
+	termios.Cflag &^= unix.CSIZE
+	termios.Cflag |= unix.CS8 // 8 data bits
+
+	// No hardware flow control
+	termios.Cflag &^= unix.CRTSCTS
+
+	// Minimum characters and timeout
+	termios.Cc[unix.VMIN] = 0
+	termios.Cc[unix.VTIME] = 0
+
+	// Set the attributes
+	if err := unix.IoctlSetTermios(fd, unix.TIOCSETA, termios); err != nil {
+		return fmt.Errorf("set termios: %w", err)
+	}
+
+	// Clear DTR and RTS (important for FTDI devices)
+	status, err := unix.IoctlGetInt(fd, unix.TIOCMGET)
+	if err == nil {
+		status &^= unix.TIOCM_DTR | unix.TIOCM_RTS
+		if err := unix.IoctlSetInt(fd, unix.TIOCMSET, status); err != nil {
+			fmt.Printf("Warning: could not clear DTR/RTS: %v\n", err)
+		}
+	}
+
+	return nil
 }
 
 // Close closes the serial port and stops auto-send if running.
