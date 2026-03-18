@@ -136,7 +136,7 @@ func OpenUSB() (*USBController, error) {
 // setBaudRate configures the FTDI chip to 250,000 baud via USB control transfer.
 // This matches OLA's implementation exactly.
 func (u *USBController) setBaudRate() error {
-	value := uint16(BaudRateDivisor)       // divisor = 12
+	value := uint16(BaudRateDivisor)                 // divisor = 12
 	index := uint16((BaudRateDivisor >> 8) & 0xFF00) // = 0
 
 	fmt.Printf("Setting baud rate: divisor=%d, value=0x%04X, index=0x%04X\n", BaudRateDivisor, value, index)
@@ -209,14 +209,6 @@ func (u *USBController) SendDMX() error {
 	u.mutex.Lock()
 	copy(u.frame[5:517], u.channels[:])
 	u.mutex.Unlock()
-
-	// Debug output - show once for verification
-	if u.frame[5] > 0 || u.frame[6] > 0 { // Only print if we have actual data
-		fmt.Printf("USB Packet: [%02X %02X %02X %02X %02X] ... [%02X]\n",
-			u.frame[0], u.frame[1], u.frame[2], u.frame[3], u.frame[4], u.frame[FrameSize-1])
-		fmt.Printf("DMX Data: CH1=%d CH2=%d CH3=%d CH4=%d CH5=%d\n", 
-			u.frame[5], u.frame[6], u.frame[7], u.frame[8], u.frame[9])
-	}
 
 	// Send bulk transfer
 	written, err := u.epOut.Write(u.frame[:])
