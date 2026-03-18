@@ -66,11 +66,15 @@ func OpenUSB() (*USBController, error) {
 		return nil, fmt.Errorf("device not found (VID=0x%04X, PID=0x%04X)", VendorID, ProductID)
 	}
 
-	// Set auto detach kernel driver
+	// Try to set auto detach kernel driver (may require sudo/permissions)
+	// On macOS, this requires the FTDI VCP driver to be unloaded first
 	if err := dev.SetAutoDetach(true); err != nil {
-		dev.Close()
-		ctx.Close()
-		return nil, fmt.Errorf("could not set auto detach: %w", err)
+		fmt.Printf("Warning: could not enable auto-detach: %v\n", err)
+		fmt.Println("This is normal on macOS. Trying to continue anyway...")
+		fmt.Println("If this fails, you may need to:")
+		fmt.Println("  1. Run with sudo: sudo go run ./cmd/example_usb/main.go")
+		fmt.Println("  2. OR unload FTDI driver: sudo kextunload -b com.apple.driver.AppleUSBFTDI")
+		// Don't return error - try to continue
 	}
 
 	// Get the active config (usually config 1)
@@ -206,10 +210,13 @@ func (u *USBController) SendDMX() error {
 	copy(u.frame[5:517], u.channels[:])
 	u.mutex.Unlock()
 
-	// Debug output
-	fmt.Printf("Sending USB packet: len=%d, header=[%02X %02X %02X %02X %02X], footer=%02X\n",
-		len(u.frame), u.frame[0], u.frame[1], u.frame[2], u.frame[3], u.frame[4], u.frame[FrameSize-1])
-	fmt.Printf("First 10 DMX channels: %v\n", u.frame[5:15])
+	// Debug output - show once for verification
+	if u.frame[5] > 0 || u.frame[6] > 0 { // Only print if we have actual data
+		fmt.Printf("USB Packet: [%02X %02X %02X %02X %02X] ... [%02X]\n",
+			u.frame[0], u.frame[1], u.frame[2], u.frame[3], u.frame[4], u.frame[FrameSize-1])
+		fmt.Printf("DMX Data: CH1=%d CH2=%d CH3=%d CH4=%d CH5=%d\n", 
+			u.frame[5], u.frame[6], u.frame[7], u.frame[8], u.frame[9])
+	}
 
 	// Send bulk transfer
 	written, err := u.epOut.Write(u.frame[:])
@@ -221,7 +228,7 @@ func (u *USBController) SendDMX() error {
 		return fmt.Errorf("incomplete transfer: wrote %d bytes, expected %d", written, FrameSize)
 	}
 
-	fmt.Printf("Successfully sent %d bytes via USB bulk transfer\n", written)
+	// Successfully sent (debug: written %d bytes)
 	return nil
 }
 
@@ -252,8 +259,8 @@ func (u *USBController) StartAutoSend(interval time.Duration) {
 	}()
 }
 
-// stopAutoSend stops the background auto-send if running.
-func (u *USBController) stopAutoSend() {
+// StopAutoSend stops the background auto-send if running.
+func (u *USBController) StopAutoSend() {
 	if u.autoSending {
 		close(u.autoSendQuit)
 		u.autoSending = false
@@ -262,7 +269,7 @@ func (u *USBController) stopAutoSend() {
 
 // Close releases all USB resources.
 func (u *USBController) Close() error {
-	u.stopAutoSend()
+	u.StopAutoSend()
 	if u.iface != nil {
 		u.iface.Close()
 	}

@@ -33,13 +33,15 @@ func main() {
 	controller.SetChannel(startAddr+7, 0)   // Auto
 	controller.SetChannel(startAddr+8, 0)   // Dimmer curve
 
-	fmt.Println("Sending full red light...")
-	if err := controller.SendDMX(); err != nil {
-		log.Fatalf("Failed to send DMX: %v", err)
-	}
+	fmt.Println("Sending full red light continuously for 10 seconds...")
+	fmt.Println("(DMX fixtures need continuous signal refresh)")
 
-	fmt.Println("Holding for 5 seconds...")
-	time.Sleep(5 * time.Second)
+	// Start auto-send to continuously refresh the DMX signal
+	// Most fixtures need updates every 30-50ms to maintain output
+	controller.StartAutoSend(30 * time.Millisecond)
+	defer controller.StopAutoSend()
+
+	time.Sleep(10 * time.Second)
 
 	// Ramp dimmer down
 	fmt.Println("Ramping dimmer down...")

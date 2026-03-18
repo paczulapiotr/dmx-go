@@ -51,23 +51,13 @@ func main() {
 	_ = controller.SetChannel(startAddr+7, 0)   // Speed: 0
 	_ = controller.SetChannel(startAddr+8, 0)   // Sound: 0
 
-	// send one packet (MK2 will hold the frame)
-	if err := controller.SendDmx(); err != nil {
-		log.Fatalf("send dmx: %v", err)
-	}
-	fmt.Println("Sent DMX frame (Full Red)")
-	fmt.Printf("Light should be red at DMX address %d\n", startAddr)
-	fmt.Println("If the light doesn't turn on, check:")
-	fmt.Println("1. DMX address setting on the fixture")
-	fmt.Println("2. DMX cable connections (XLR connectors)")
-	fmt.Println("3. Light is powered on and in DMX mode")
-
-	// Keep light on for 5 seconds
-	fmt.Println("Keeping light on for 5 seconds...")
-	time.Sleep(5 * time.Second)
-
-	// Optional: start continuous sending (for effects)
+	// Start continuous sending (DMX fixtures need regular updates!)
+	fmt.Println("Starting continuous DMX output...")
 	controller.StartAutoSend(30 * time.Millisecond)
+	
+	fmt.Printf("Light should be red at DMX address %d\n", startAddr)
+	fmt.Println("Keeping light on for 10 seconds...")
+	time.Sleep(10 * time.Second)
 
 	// Ramp Dimmer (CH1) down smoothly to demonstrate control
 	fmt.Println("Ramping down dimmer...")
