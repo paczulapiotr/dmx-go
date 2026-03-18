@@ -23,14 +23,14 @@ func main() {
 	startAddr := 1
 
 	// Set full red: Dimmer=255, Red=255, others=0
-	controller.SetChannel(startAddr, 255)   // Dimmer
-	controller.SetChannel(startAddr+1, 255) // Red
-	controller.SetChannel(startAddr+2, 0)   // Green
-	controller.SetChannel(startAddr+3, 0)   // Blue
-	controller.SetChannel(startAddr+4, 0)   // White
-	controller.SetChannel(startAddr+5, 0)   // Strobe
-	controller.SetChannel(startAddr+6, 0)   // Color preset
-	controller.SetChannel(startAddr+7, 0)   // Auto
+	controller.SetChannel(startAddr, 255)   // DIMMER
+	controller.SetChannel(startAddr+1, 0)   // STROBE
+	controller.SetChannel(startAddr+2, 0)   // RED
+	controller.SetChannel(startAddr+3, 0)   // GREEN
+	controller.SetChannel(startAddr+4, 0)   // BLUE
+	controller.SetChannel(startAddr+5, 0)   // WHITE
+	controller.SetChannel(startAddr+6, 0)   // ??
+	controller.SetChannel(startAddr+7, 255) // Auto
 	controller.SetChannel(startAddr+8, 0)   // Dimmer curve
 
 	fmt.Println("Sending full red light continuously for 10 seconds...")
@@ -38,7 +38,7 @@ func main() {
 
 	// Start auto-send to continuously refresh the DMX signal
 	// Most fixtures need updates every 30-50ms to maintain output
-	controller.StartAutoSend(30 * time.Millisecond)
+	controller.StartAutoSend(50 * time.Millisecond)
 	defer controller.StopAutoSend()
 
 	time.Sleep(10 * time.Second)

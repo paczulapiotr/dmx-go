@@ -54,7 +54,7 @@ func main() {
 	// Start continuous sending (DMX fixtures need regular updates!)
 	fmt.Println("Starting continuous DMX output...")
 	controller.StartAutoSend(30 * time.Millisecond)
-	
+
 	fmt.Printf("Light should be red at DMX address %d\n", startAddr)
 	fmt.Println("Keeping light on for 10 seconds...")
 	time.Sleep(10 * time.Second)
