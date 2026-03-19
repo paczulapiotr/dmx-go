@@ -51,6 +51,29 @@ func (t *transition) Tick(w ChannelWriter) bool {
 	return true
 }
 
+// throttledTicker wraps a function so it is called at most once per period,
+// regardless of how frequently the render loop invokes Tick.
+// State shared between calls should be captured in fn's closure.
+type throttledTicker struct {
+	period   time.Duration
+	lastTick time.Time
+	fn       func(w ChannelWriter) bool
+}
+
+// NewThrottledTicker returns an EffectTicker that calls fn at most once per period.
+// fn follows the same contract as EffectTicker.Tick: return false to signal completion.
+func NewThrottledTicker(period time.Duration, fn func(w ChannelWriter) bool) EffectTicker {
+	return &throttledTicker{period: period, lastTick: time.Now(), fn: fn}
+}
+
+func (t *throttledTicker) Tick(w ChannelWriter) bool {
+	if time.Since(t.lastTick) < t.period {
+		return true
+	}
+	t.lastTick = t.lastTick.Add(t.period)
+	return t.fn(w)
+}
+
 // HSVToRGB converts an HSV colour (h: 0–360°, s: 0–1, v: 0–1) to RGB bytes (0–255 each).
 func HSVToRGB(h, s, v float64) (r, g, b byte) {
 	h = math.Mod(h, 360)

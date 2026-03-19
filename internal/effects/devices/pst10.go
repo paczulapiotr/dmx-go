@@ -17,9 +17,8 @@ package devices
 //
 // Supported actions:
 //
-//	"red", "green", "blue", "white", "off"   – 200 ms colour transition
-//	"warm"                                   – soft warm white (R+W mix) transition
-//	"rainbow"                                – infinite hue cycle
+//	"red", "green", "blue", "white", "warm", "off" – 200 ms colour transition
+//	"rainbow"                                       – infinite hue cycle (~30 fps)
 import (
 	"time"
 
@@ -29,28 +28,24 @@ import (
 const (
 	pst10NumChannels = 9
 	pst10Dimmer      = 0
-	pst10Strobe      = 1
 	pst10Red         = 2
 	pst10Green       = 3
 	pst10Blue        = 4
 	pst10White       = 5
-	pst10ColorMacro  = 6
-	pst10AutoProgram = 7
-	pst10DimmerCurve = 8
 
 	pst10TransitionDuration = 200 * time.Millisecond
-	// Rainbow updates its colour at this rate regardless of render fps.
-	pst10RainbowPeriod = 33 * time.Millisecond
-	pst10RainbowStep   = 1.0 // degrees per visual frame
+	pst10RainbowPeriod      = 33 * time.Millisecond // ~30 visual fps
+	pst10RainbowStep        = 1.0                   // degrees per visual frame
 )
 
+// pst10Color builds a transition effect that fades to the given RGBW values.
 func pst10Color(name string, r, g, b, w byte) *effects.Effect {
 	return &effects.Effect{
 		Name:        name,
 		Type:        effects.EffectTypeTransition,
 		NumChannels: pst10NumChannels,
 		New: func(current []byte) effects.EffectTicker {
-			target := make([]byte, pst10NumChannels)
+			target := [pst10NumChannels]byte{}
 			if r > 0 || g > 0 || b > 0 || w > 0 {
 				target[pst10Dimmer] = 255
 			}
@@ -58,43 +53,25 @@ func pst10Color(name string, r, g, b, w byte) *effects.Effect {
 			target[pst10Green] = g
 			target[pst10Blue] = b
 			target[pst10White] = w
-			return effects.NewTransition(current, target, pst10TransitionDuration)
+			return effects.NewTransition(current, target[:], pst10TransitionDuration)
 		},
 	}
 }
 
-// pst10RainbowTicker advances a hue cycle on every visual frame (pst10RainbowPeriod).
-// Render ticks faster than the period are skipped, keeping animation speed
-// independent of the render interval.
-type pst10RainbowTicker struct {
-	hue      float64
-	channels [pst10NumChannels]byte
-	lastTick time.Time
-}
-
+// newPST10Rainbow creates an infinite hue-cycling effect.
+// All state is captured in the closure — no struct required.
 func newPST10Rainbow() effects.EffectTicker {
-	t := &pst10RainbowTicker{lastTick: time.Now()}
-	t.channels[pst10Dimmer] = 255
-	return t
-}
-
-func (r *pst10RainbowTicker) Tick(w effects.ChannelWriter) bool {
-	if time.Since(r.lastTick) < pst10RainbowPeriod {
-		return true // not yet time for the next visual frame
-	}
-	r.lastTick = r.lastTick.Add(pst10RainbowPeriod)
-
-	rv, gv, bv := effects.HSVToRGB(r.hue, 1.0, 1.0)
-	r.channels[pst10Red] = rv
-	r.channels[pst10Green] = gv
-	r.channels[pst10Blue] = bv
-	w.SetValues(r.channels[:])
-
-	r.hue += pst10RainbowStep
-	if r.hue >= 360.0 {
-		r.hue -= 360.0
-	}
-	return true
+	channels := [pst10NumChannels]byte{pst10Dimmer: 255}
+	var hue float64
+	return effects.NewThrottledTicker(pst10RainbowPeriod, func(w effects.ChannelWriter) bool {
+		channels[pst10Red], channels[pst10Green], channels[pst10Blue] = effects.HSVToRGB(hue, 1.0, 1.0)
+		w.SetValues(channels[:])
+		hue += pst10RainbowStep
+		if hue >= 360 {
+			hue -= 360
+		}
+		return true
+	})
 }
 
 // PST10Fixture returns the fully configured Fixture for the Eurolite PST-10.
@@ -103,18 +80,13 @@ func PST10Fixture() *effects.Fixture {
 		Name:        "Eurolite LED PST-10 QCL Spot (9ch)",
 		NumChannels: pst10NumChannels,
 		Actions: map[string]*effects.Effect{
-			"red":   pst10Color("red", 255, 0, 0, 0),
-			"green": pst10Color("green", 0, 255, 0, 0),
-			"blue":  pst10Color("blue", 0, 0, 255, 0),
-			"white": pst10Color("white", 0, 0, 0, 255),
-			"warm":  pst10Color("warm", 200, 0, 0, 180),
-			"off":   pst10Color("off", 0, 0, 0, 0),
-			"rainbow": {
-				Name:        "rainbow",
-				Type:        effects.EffectTypeInfinite,
-				NumChannels: pst10NumChannels,
-				New:         func(_ []byte) effects.EffectTicker { return newPST10Rainbow() },
-			},
+			"red":     pst10Color("red", 255, 0, 0, 0),
+			"green":   pst10Color("green", 0, 255, 0, 0),
+			"blue":    pst10Color("blue", 0, 0, 255, 0),
+			"white":   pst10Color("white", 0, 0, 0, 255),
+			"warm":    pst10Color("warm", 200, 0, 0, 180),
+			"off":     pst10Color("off", 0, 0, 0, 0),
+			"rainbow": effects.Infinite("rainbow", pst10NumChannels, newPST10Rainbow),
 		},
 	}
 }

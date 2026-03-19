@@ -59,7 +59,7 @@ func init() {
 	f := rootCmd.Flags()
 	f.String("rabbitmq-url", "amqp://guest:guest@localhost:5672/", "RabbitMQ connection URL")
 	f.String("queue", "dmx", "RabbitMQ queue name to consume from")
-	f.Duration("interval", 50*time.Millisecond, "DMX auto-send interval")
+	f.Duration("interval", 33*time.Millisecond, "DMX auto-send interval")
 
 }
 

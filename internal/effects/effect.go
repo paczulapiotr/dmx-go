@@ -40,3 +40,14 @@ type Fixture struct {
 type DMXDevice interface {
 	SendFrame(data []byte) error
 }
+
+// Infinite builds an Effect that runs forever, ignoring the current channel state.
+// factory is called once when the effect starts; it must return a fresh EffectTicker.
+func Infinite(name string, numChannels int, factory func() EffectTicker) *Effect {
+	return &Effect{
+		Name:        name,
+		Type:        EffectTypeInfinite,
+		NumChannels: numChannels,
+		New:         func(_ []byte) EffectTicker { return factory() },
+	}
+}

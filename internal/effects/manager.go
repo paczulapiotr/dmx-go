@@ -27,6 +27,9 @@ type activeEffect struct {
 	// buf is the current channel state for this fixture.
 	// Written by ticker.Tick; read by the render loop to compose the universe.
 	buf []byte
+	// writer is reused on every render tick to avoid a heap allocation per tick.
+	// Its buf field is wired to this effect's buf slice at creation time.
+	writer directWriter
 }
 
 // Manager drives all DMX effects from a single render loop.
@@ -80,8 +83,7 @@ func (m *Manager) renderLoop(interval time.Duration) {
 			m.mu.Lock()
 			for _, ae := range m.active {
 				if ae.ticker != nil {
-					w := &directWriter{buf: ae.buf}
-					if !ae.ticker.Tick(w) {
+					if !ae.ticker.Tick(&ae.writer) {
 						// Transition finished: freeze at final state.
 						ae.ticker = nil
 						m.logger.Printf("[effect] finished  addr=%-3d effect=%s", ae.startAddr, ae.name)
@@ -129,13 +131,15 @@ func (m *Manager) Apply(startAddr int, lightType, action string) error {
 	buf := make([]byte, fixture.NumChannels)
 	copy(buf, current)
 
-	m.active[startAddr] = &activeEffect{
+	ae := &activeEffect{
 		name:      effect.Name,
 		startAddr: startAddr,
 		numChans:  fixture.NumChannels,
 		ticker:    effect.New(current),
 		buf:       buf,
 	}
+	ae.writer.buf = buf // wire once; the render loop reuses &ae.writer every tick
+	m.active[startAddr] = ae
 
 	m.logger.Printf("[effect] started   addr=%-3d type=%-6s action=%-12s effect=%s (%s)",
 		startAddr, lightType, action, effect.Name, effect.Type)
