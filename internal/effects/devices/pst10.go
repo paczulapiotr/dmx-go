@@ -69,6 +69,9 @@ func PST10Fixture() *effects.Fixture {
 		NumChannels: pst10NumChannels,
 		Run: func(ctx context.Context, cw effects.ChannelWriter, startAddr int, current []byte) error {
 			hue := 0.0
+			channels := make([]byte, pst10NumChannels) // reused every tick
+			channels[pst10Dimmer] = 255
+
 			ticker := time.NewTicker(pst10RainbowTickRate)
 			defer ticker.Stop()
 
@@ -78,8 +81,6 @@ func PST10Fixture() *effects.Fixture {
 					return nil
 				case <-ticker.C:
 					r, g, b := effects.HSVToRGB(hue, 1.0, 1.0)
-					channels := make([]byte, pst10NumChannels)
-					channels[pst10Dimmer] = 255
 					channels[pst10Red] = r
 					channels[pst10Green] = g
 					channels[pst10Blue] = b

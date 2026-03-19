@@ -34,8 +34,8 @@ type Fixture struct {
 	Actions map[string]*Effect
 }
 
-// DMXDevice is the interface implemented by both dmx.DMXController and dmx.USBController.
+// DMXDevice is the interface implemented by dmx.USBController.
 type DMXDevice interface {
-	SetChannel(channel int, value byte) error
-	SetChannels(values map[int]byte) error
+	// SetChannelRange writes len(values) channels starting at startChannel (1-based).
+	SetChannelRange(startChannel int, values []byte) error
 }

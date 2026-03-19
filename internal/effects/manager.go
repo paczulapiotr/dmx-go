@@ -16,19 +16,16 @@ type trackingWriter struct {
 }
 
 func (w *trackingWriter) SetRange(startChannel int, values []byte) {
-	chMap := make(map[int]byte, len(values))
-
 	w.mu.Lock()
 	for i, v := range values {
-		ch := startChannel + i
-		if ch >= 1 && ch <= 512 {
-			w.current[ch-1] = v
-			chMap[ch] = v
+		ch := startChannel - 1 + i
+		if ch >= 0 && ch < 512 {
+			w.current[ch] = v
 		}
 	}
 	w.mu.Unlock()
 
-	_ = w.device.SetChannels(chMap)
+	_ = w.device.SetChannelRange(startChannel, values)
 }
 
 func (w *trackingWriter) GetRange(startChannel int, numChannels int) []byte {

@@ -192,6 +192,20 @@ func (u *USBController) SetChannels(values map[int]byte) error {
 	return nil
 }
 
+// SetChannelRange writes len(values) channels starting at startChannel (1-based).
+// This is the preferred method for effects as it avoids map allocation.
+func (u *USBController) SetChannelRange(startChannel int, values []byte) error {
+	u.mutex.Lock()
+	for i, v := range values {
+		ch := startChannel - 1 + i
+		if ch >= 0 && ch < 512 {
+			u.channels[ch] = v
+		}
+	}
+	u.mutex.Unlock()
+	return nil
+}
+
 // SetAll sets all 512 channels from a slice (len must be 512).
 func (u *USBController) SetAll(data []byte) error {
 	if len(data) != 512 {

@@ -99,6 +99,9 @@ func B40Fixture() *effects.Fixture {
 		NumChannels: b40NumChannels,
 		Run: func(ctx context.Context, cw effects.ChannelWriter, startAddr int, current []byte) error {
 			hue := 0.0
+			channels := make([]byte, b40NumChannels) // reused every tick
+			channels[b40Dimmer] = 255
+
 			ticker := time.NewTicker(b40RainbowTickRate)
 			defer ticker.Stop()
 
@@ -108,8 +111,6 @@ func B40Fixture() *effects.Fixture {
 					return nil
 				case <-ticker.C:
 					r, g, b := effects.HSVToRGB(hue, 1.0, 1.0)
-					channels := make([]byte, b40NumChannels)
-					channels[b40Dimmer] = 255
 					channels[b40Red] = r
 					channels[b40Green] = g
 					channels[b40Blue] = b

@@ -20,6 +20,9 @@ func Transition(ctx context.Context, w ChannelWriter, startAddr int, from, to []
 	stepDuration := duration / steps
 	current := make([]byte, len(from))
 
+	ticker := time.NewTicker(stepDuration)
+	defer ticker.Stop()
+
 	for step := 1; step <= steps; step++ {
 		t := float64(step) / float64(steps)
 		for i := range current {
@@ -28,12 +31,10 @@ func Transition(ctx context.Context, w ChannelWriter, startAddr int, from, to []
 		}
 		w.SetRange(startAddr, current)
 
-		timer := time.NewTimer(stepDuration)
 		select {
 		case <-ctx.Done():
-			timer.Stop()
 			return ctx.Err()
-		case <-timer.C:
+		case <-ticker.C:
 		}
 	}
 	return nil
