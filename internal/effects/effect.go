@@ -2,13 +2,12 @@ package effects
 
 import "context"
 
-// ChannelWriter is the interface that effects use to write DMX channel values.
-// All channel numbers are 1-based (DMX standard).
+// ChannelWriter is the interface that effects use to update their slot buffer.
 type ChannelWriter interface {
-	// SetRange writes len(values) channels starting at startChannel.
-	SetRange(startChannel int, values []byte)
-	// GetRange returns a snapshot of the current tracked values for the given range.
-	GetRange(startChannel int, numChannels int) []byte
+	// SetValues overwrites the slot buffer with the given values.
+	SetValues(values []byte)
+	// GetValues returns a snapshot of the current slot buffer.
+	GetValues() []byte
 }
 
 // Effect describes a single named DMX effect that can be applied to a fixture.
@@ -21,7 +20,7 @@ type Effect struct {
 	// current contains the channel values that were active before this effect started,
 	// allowing smooth interpolation from the previous state.
 	// Effects must return once complete or when ctx is cancelled.
-	Run func(ctx context.Context, w ChannelWriter, startAddr int, current []byte) error
+	Run func(ctx context.Context, w ChannelWriter, current []byte) error
 }
 
 // Fixture describes a supported DMX fixture model and its available actions.
@@ -36,6 +35,7 @@ type Fixture struct {
 
 // DMXDevice is the interface implemented by dmx.USBController.
 type DMXDevice interface {
-	// SetChannelRange writes len(values) channels starting at startChannel (1-based).
-	SetChannelRange(startChannel int, values []byte) error
+	// SendFrame atomically writes a full 512-channel DMX universe to the device.
+	// data must be exactly 512 bytes.
+	SendFrame(data []byte) error
 }

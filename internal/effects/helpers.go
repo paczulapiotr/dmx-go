@@ -9,11 +9,11 @@ import (
 // Transition smoothly interpolates DMX channel values from `from` to `to` over `duration`.
 // It writes intermediate values to the ChannelWriter on each step.
 // Returns ctx.Err() if the context is cancelled mid-transition.
-func Transition(ctx context.Context, w ChannelWriter, startAddr int, from, to []byte, duration time.Duration) error {
+func Transition(ctx context.Context, w ChannelWriter, from, to []byte, duration time.Duration) error {
 	const steps = 50
 
 	if duration <= 0 {
-		w.SetRange(startAddr, to)
+		w.SetValues(to)
 		return nil
 	}
 
@@ -29,7 +29,7 @@ func Transition(ctx context.Context, w ChannelWriter, startAddr int, from, to []
 			val := float64(from[i]) + t*(float64(to[i])-float64(from[i]))
 			current[i] = byte(math.Round(val))
 		}
-		w.SetRange(startAddr, current)
+		w.SetValues(current)
 
 		select {
 		case <-ctx.Done():

@@ -78,7 +78,7 @@ func b40Color(name string, rv, gv, bv, wv byte) *effects.Effect {
 	return &effects.Effect{
 		Name:        name,
 		NumChannels: b40NumChannels,
-		Run: func(ctx context.Context, cw effects.ChannelWriter, startAddr int, current []byte) error {
+		Run: func(ctx context.Context, cw effects.ChannelWriter, current []byte) error {
 			target := make([]byte, b40NumChannels)
 			if rv > 0 || gv > 0 || bv > 0 || wv > 0 {
 				target[b40Dimmer] = 255
@@ -87,7 +87,7 @@ func b40Color(name string, rv, gv, bv, wv byte) *effects.Effect {
 			target[b40Green] = gv
 			target[b40Blue] = bv
 			target[b40White] = wv
-			return effects.Transition(ctx, cw, startAddr, current, target, b40TransitionDuration)
+			return effects.Transition(ctx, cw, current, target, b40TransitionDuration)
 		},
 	}
 }
@@ -97,7 +97,7 @@ func B40Fixture() *effects.Fixture {
 	rainbow := &effects.Effect{
 		Name:        "rainbow",
 		NumChannels: b40NumChannels,
-		Run: func(ctx context.Context, cw effects.ChannelWriter, startAddr int, current []byte) error {
+		Run: func(ctx context.Context, cw effects.ChannelWriter, _ []byte) error {
 			hue := 0.0
 			channels := make([]byte, b40NumChannels) // reused every tick
 			channels[b40Dimmer] = 255
@@ -114,7 +114,7 @@ func B40Fixture() *effects.Fixture {
 					channels[b40Red] = r
 					channels[b40Green] = g
 					channels[b40Blue] = b
-					cw.SetRange(startAddr, channels)
+					cw.SetValues(channels)
 
 					hue += b40RainbowHueStep
 					if hue >= 360.0 {
@@ -128,12 +128,12 @@ func B40Fixture() *effects.Fixture {
 	strobe := &effects.Effect{
 		Name:        "strobe",
 		NumChannels: b40NumChannels,
-		Run: func(ctx context.Context, cw effects.ChannelWriter, startAddr int, current []byte) error {
+		Run: func(ctx context.Context, cw effects.ChannelWriter, _ []byte) error {
 			channels := make([]byte, b40NumChannels)
 			channels[b40Dimmer] = 255
 			channels[b40White] = 255
 			channels[b40Strobe] = 128 // ~50 % strobe speed
-			cw.SetRange(startAddr, channels)
+			cw.SetValues(channels)
 			<-ctx.Done()
 			return nil
 		},

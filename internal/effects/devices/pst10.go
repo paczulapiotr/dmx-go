@@ -48,7 +48,7 @@ func pst10Color(name string, r, g, b, w byte) *effects.Effect {
 	return &effects.Effect{
 		Name:        name,
 		NumChannels: pst10NumChannels,
-		Run: func(ctx context.Context, cw effects.ChannelWriter, startAddr int, current []byte) error {
+		Run: func(ctx context.Context, cw effects.ChannelWriter, current []byte) error {
 			target := make([]byte, pst10NumChannels)
 			if r > 0 || g > 0 || b > 0 || w > 0 {
 				target[pst10Dimmer] = 255
@@ -57,7 +57,7 @@ func pst10Color(name string, r, g, b, w byte) *effects.Effect {
 			target[pst10Green] = g
 			target[pst10Blue] = b
 			target[pst10White] = w
-			return effects.Transition(ctx, cw, startAddr, current, target, pst10TransitionDuration)
+			return effects.Transition(ctx, cw, current, target, pst10TransitionDuration)
 		},
 	}
 }
@@ -67,7 +67,7 @@ func PST10Fixture() *effects.Fixture {
 	rainbow := &effects.Effect{
 		Name:        "rainbow",
 		NumChannels: pst10NumChannels,
-		Run: func(ctx context.Context, cw effects.ChannelWriter, startAddr int, current []byte) error {
+		Run: func(ctx context.Context, cw effects.ChannelWriter, _ []byte) error {
 			hue := 0.0
 			channels := make([]byte, pst10NumChannels) // reused every tick
 			channels[pst10Dimmer] = 255
@@ -84,7 +84,7 @@ func PST10Fixture() *effects.Fixture {
 					channels[pst10Red] = r
 					channels[pst10Green] = g
 					channels[pst10Blue] = b
-					cw.SetRange(startAddr, channels)
+					cw.SetValues(channels)
 
 					hue += pst10RainbowHueStep
 					if hue >= 360.0 {

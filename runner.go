@@ -34,7 +34,7 @@ func RunController(cfg Config, logger *log.Logger) error {
 	}
 	defer ctrl.Close()
 
-	mgr := buildManager(ctrl, logger)
+	mgr := buildManager(ctrl, logger, cfg.Interval)
 
 	deliveries, conn, ch, err := connectAMQP(cfg, logger)
 	if err != nil {
@@ -46,21 +46,21 @@ func RunController(cfg Config, logger *log.Logger) error {
 	return consumeLoop(deliveries, mgr, logger)
 }
 
-// openDMX opens the USB DMX adapter and starts auto-send.
+// openDMX opens the USB DMX adapter. The render loop inside the Manager
+// is responsible for all sends — StartAutoSend is not used.
 func openDMX(cfg Config, logger *log.Logger) (*dmx.USBController, error) {
 	logger.Println("[dmx] opening USB DMX adapter")
 	ctrl, err := dmx.OpenUSB()
 	if err != nil {
 		return nil, fmt.Errorf("open USB DMX adapter: %w", err)
 	}
-	ctrl.StartAutoSend(cfg.Interval)
-	logger.Printf("[dmx] auto-send interval: %s", cfg.Interval)
+	logger.Printf("[dmx] render interval: %s", cfg.Interval)
 	return ctrl, nil
 }
 
 // buildManager creates the effect manager and registers all supported fixtures.
-func buildManager(device effects.DMXDevice, logger *log.Logger) *effects.Manager {
-	mgr := effects.NewManager(device, logger)
+func buildManager(device effects.DMXDevice, logger *log.Logger, renderInterval time.Duration) *effects.Manager {
+	mgr := effects.NewManager(device, logger, renderInterval)
 	mgr.RegisterFixture("pst10", devices.PST10Fixture())
 	mgr.RegisterFixture("b40", devices.B40Fixture())
 	logger.Println("[dmx] registered fixtures: pst10, b40")
