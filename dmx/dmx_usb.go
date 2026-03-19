@@ -120,17 +120,13 @@ func (u *USBController) setBaudRate() error {
 // universe and delivers it to the device in a single USB bulk write.
 // data must be at least 512 bytes.
 func (u *USBController) SendFrame(data []byte) error {
-	if len(data) < 512 {
-		return fmt.Errorf("SendFrame: need at least 512 bytes, got %d", len(data))
-	}
-
 	var frame [FrameSize]byte
 	frame[0] = StartOfMessage
 	frame[1] = DMXLabel
 	frame[2] = 0x01 // length LSB (513 & 0xFF)
 	frame[3] = 0x02 // length MSB (513 >> 8)
 	frame[4] = DMXStartCode
-	copy(frame[5:517], data[:512])
+	copy(frame[5:517], data) // copy clamps to the destination length; shorter data is zero-padded
 	frame[FrameSize-1] = EndOfMessage
 
 	written, err := u.epOut.Write(frame[:])

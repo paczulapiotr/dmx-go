@@ -1,43 +1,54 @@
 package effects
 
 import (
-	"context"
 	"math"
 	"time"
 )
 
-// Transition smoothly interpolates DMX channel values from `from` to `to` over `duration`.
-// It writes intermediate values to the ChannelWriter on each step.
-// Returns ctx.Err() if the context is cancelled mid-transition.
-func Transition(ctx context.Context, w ChannelWriter, from, to []byte, duration time.Duration) error {
-	const steps = 50
+// transition is an EffectTicker that smoothly interpolates channel values
+// from an initial state to a target state over a fixed duration.
+// It is time-based, so the animation speed is independent of render fps.
+type transition struct {
+	from     []byte
+	to       []byte
+	buf      []byte
+	start    time.Time
+	duration time.Duration
+}
 
-	if duration <= 0 {
-		w.SetValues(to)
-		return nil
+// NewTransition creates a transition EffectTicker from current to target over duration.
+func NewTransition(current, target []byte, duration time.Duration) EffectTicker {
+	from := make([]byte, len(current))
+	copy(from, current)
+	to := make([]byte, len(target))
+	copy(to, target)
+	return &transition{
+		from:     from,
+		to:       to,
+		buf:      make([]byte, len(from)),
+		start:    time.Now(),
+		duration: duration,
+	}
+}
+
+func (t *transition) Tick(w ChannelWriter) bool {
+	if t.duration <= 0 {
+		w.SetValues(t.to)
+		return false
 	}
 
-	stepDuration := duration / steps
-	current := make([]byte, len(from))
-
-	ticker := time.NewTicker(stepDuration)
-	defer ticker.Stop()
-
-	for step := 1; step <= steps; step++ {
-		t := float64(step) / float64(steps)
-		for i := range current {
-			val := float64(from[i]) + t*(float64(to[i])-float64(from[i]))
-			current[i] = byte(math.Round(val))
-		}
-		w.SetValues(current)
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-		}
+	ratio := float64(time.Since(t.start)) / float64(t.duration)
+	if ratio >= 1.0 {
+		w.SetValues(t.to)
+		return false
 	}
-	return nil
+
+	for i := range t.buf {
+		val := float64(t.from[i]) + ratio*(float64(t.to[i])-float64(t.from[i]))
+		t.buf[i] = byte(math.Round(val))
+	}
+	w.SetValues(t.buf)
+	return true
 }
 
 // HSVToRGB converts an HSV colour (h: 0–360°, s: 0–1, v: 0–1) to RGB bytes (0–255 each).

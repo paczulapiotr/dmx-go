@@ -1,41 +1,42 @@
 package effects
 
-import "context"
+// EffectType indicates whether an effect runs once or loops indefinitely.
+type EffectType string
 
-// ChannelWriter is the interface that effects use to update their slot buffer.
+const (
+	EffectTypeTransition EffectType = "transition"
+	EffectTypeInfinite   EffectType = "infinite"
+)
+
+// ChannelWriter is the interface effects use to update their channel buffer.
 type ChannelWriter interface {
-	// SetValues overwrites the slot buffer with the given values.
 	SetValues(values []byte)
-	// GetValues returns a snapshot of the current slot buffer.
-	GetValues() []byte
 }
 
-// Effect describes a single named DMX effect that can be applied to a fixture.
+// EffectTicker is a stateful effect instance driven by the render loop.
+// The render loop calls Tick on every frame.
+// Transition effects return false when complete; infinite effects always return true.
+type EffectTicker interface {
+	Tick(w ChannelWriter) bool
+}
+
+// Effect is a descriptor and factory for a named DMX effect.
 type Effect struct {
-	// Name is the human-readable identifier used in log messages.
-	Name string
-	// NumChannels is the number of DMX channels this effect occupies.
+	Name        string
+	Type        EffectType
 	NumChannels int
-	// Run executes the effect.
-	// current contains the channel values that were active before this effect started,
-	// allowing smooth interpolation from the previous state.
-	// Effects must return once complete or when ctx is cancelled.
-	Run func(ctx context.Context, w ChannelWriter, current []byte) error
+	// New creates a fresh EffectTicker initialised with the fixture's current channel state.
+	New func(current []byte) EffectTicker
 }
 
-// Fixture describes a supported DMX fixture model and its available actions.
+// Fixture describes a DMX fixture model and its available actions.
 type Fixture struct {
-	// Name is the human-readable fixture model name.
-	Name string
-	// NumChannels is the total number of DMX channels the fixture occupies.
+	Name        string
 	NumChannels int
-	// Actions maps action names (e.g. "red", "rainbow") to their Effect definitions.
-	Actions map[string]*Effect
+	Actions     map[string]*Effect
 }
 
 // DMXDevice is the interface implemented by dmx.USBController.
 type DMXDevice interface {
-	// SendFrame atomically writes a full 512-channel DMX universe to the device.
-	// data must be exactly 512 bytes.
 	SendFrame(data []byte) error
 }
